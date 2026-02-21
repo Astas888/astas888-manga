@@ -1,4 +1,34 @@
 sudo tee frontend/index.html > /dev/null <<'EOF'
+  <!-- Search Section -->
+<div class="mb-6">
+  <input v-model="searchQuery" @input="doSearch"
+         placeholder="Search manga..." class="px-4 py-2 rounded-l bg-gray-800 border border-gray-700 w-2/3" />
+  <button @click="doSearch" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-r">Search</button>
+</div>
+
+<!-- Autocomplete Results -->
+<ul v-if="searchResults.length > 0" class="bg-gray-800 rounded p-4 mb-6 max-h-80 overflow-y-auto">
+  <li v-for="r in searchResults" :key="r.url"
+      class="py-2 border-b border-gray-700 flex justify-between items-center">
+    <span>{{ r.title }} <span class="text-sm text-gray-500">({{ r.source }})</span></span>
+    <button @click="startDownload(r.url)" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">Download</button>
+  </li>
+</ul>
+
+<!-- Source Management -->
+<div class="mb-8">
+  <h2 class="text-lg font-semibold mb-2">Sources</h2>
+  <div class="flex flex-wrap gap-2">
+    <span v-for="s in sources" :key="s" class="bg-gray-700 px-3 py-1 rounded">
+      {{ s }}
+      <button @click="removeSource(s)" class="ml-2 text-red-400 hover:text-red-600">x</button>
+    </span>
+  </div>
+  <div class="mt-2 flex">
+    <input v-model="newSource" placeholder="Add new source..." class="px-2 py-1 rounded-l bg-gray-800 border border-gray-700" />
+    <button @click="addSource" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-r">Add</button>
+  </div>
+</div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
