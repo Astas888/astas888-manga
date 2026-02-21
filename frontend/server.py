@@ -177,3 +177,71 @@ async def serve_index():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return HTMLResponse("<h1>Astas888 Manga API</h1><p>Frontend not found.</p>", status_code=404)
+
+# -------------------------------------------------------
+# 🔍 Search API
+# -------------------------------------------------------
+
+@app.get("/api/v1/search")
+async def search_manga(q: str):
+    """
+    Search available sources for a manga title.
+    Example: /api/v1/search?q=one%20piece
+    """
+    from sources import find_source_for_url
+    results = []
+
+    # For now only Mangapill; more sources can be looped here
+    base = "https://mangapill.com"
+    search_url = f"{base}/search?q={q.replace(' ', '+')}"
+    import httpx
+    from bs4 import BeautifulSoup
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(search_url)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a in soup.select("a[href^='/manga/']"):
+            title = a.text.strip()
+            href = a.get("href")
+            if href and title:
+                results.append({
+                    "title": title,
+                    "url": base + href,
+                    "source": "mangapill"
+                })
+
+    return results
+
+
+# -------------------------------------------------------
+# ⚙️ Manage Sources
+# -------------------------------------------------------
+
+@app.get("/api/v1/sources")
+async def get_sources():
+    """Return active sources."""
+    r = app.state.redis
+    raw = await r.get("sources")
+    return json.loads(raw) if raw else ["mangapill"]
+
+@app.post("/api/v1/sources")
+async def add_source(data: dict = Body(...)):
+    """Add a new source dynamically."""
+    r = app.state.redis
+    src = data.get("name")
+    if not src:
+        raise HTTPException(400, "Missing source name")
+    current = json.loads(await r.get("sources") or "[]")
+    if src not in current:
+        current.append(src)
+        await r.set("sources", json.dumps(current))
+    return {"sources": current}
+
+@app.delete("/api/v1/sources/{name}")
+async def remove_source(name: str):
+    """Remove a source by name."""
+    r = app.state.redis
+    current = json.loads(await r.get("sources") or "[]")
+    current = [s for s in current if s != name]
+    await r.set("sources", json.dumps(current))
+    return {"sources": current}
