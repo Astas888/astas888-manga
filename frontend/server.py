@@ -266,19 +266,28 @@ async def search_manga(q: str = Query(..., description="Search query")):
 
 @app.get("/api/v1/sources")
 async def get_sources():
-    """Return active sources."""
+    """Return a list of available manga sources."""
     r = app.state.redis
     raw = await r.get("sources")
-    return json.loads(raw) if raw else ["mangapill"]
+    if not raw:
+        # Default list when Redis is empty
+        default_sources = ["Mangapill", "MangaDex", "MangaSee", "Mangakakalot"]
+        await r.set("sources", json.dumps(default_sources))
+        return default_sources
+    try:
+        return json.loads(raw)
+    except Exception:
+        return ["Mangapill"]
 
 @app.post("/api/v1/sources")
 async def add_source(data: dict = Body(...)):
-    """Add a new source dynamically."""
+    """Add a new source name to the list."""
     r = app.state.redis
     src = data.get("name")
     if not src:
-        raise HTTPException(400, "Missing source name")
-    current = json.loads(await r.get("sources") or "[]")
+        raise HTTPException(400, "Missing 'name' in request")
+    raw = await r.get("sources")
+    current = json.loads(raw) if raw else []
     if src not in current:
         current.append(src)
         await r.set("sources", json.dumps(current))
@@ -286,9 +295,10 @@ async def add_source(data: dict = Body(...)):
 
 @app.delete("/api/v1/sources/{name}")
 async def remove_source(name: str):
-    """Remove a source by name."""
+    """Remove a source from the list."""
     r = app.state.redis
-    current = json.loads(await r.get("sources") or "[]")
-    current = [s for s in current if s != name]
-    await r.set("sources", json.dumps(current))
-    return {"sources": current}
+    raw = await r.get("sources")
+    current = json.loads(raw) if raw else []
+    updated = [s for s in current if s.lower() != name.lower()]
+    await r.set("sources", json.dumps(updated))
+    return {"sources": updated}
