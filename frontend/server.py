@@ -182,35 +182,82 @@ async def serve_index():
 # 🔍 Search API
 # -------------------------------------------------------
 
+from fastapi import Query
+
 @app.get("/api/v1/search")
-async def search_manga(q: str):
+async def search_manga(q: str = Query(..., description="Search query")):
     """
-    Search available sources for a manga title.
-    Example: /api/v1/search?q=one%20piece
+    Search across multiple manga sources (Mangapill, MangaDex, MangaSee, Mangakakalot).
     """
-    from sources import find_source_for_url
+    from bs4 import BeautifulSoup
+    import httpx
+
+    q_clean = q.strip()
     results = []
 
-    # For now only Mangapill; more sources can be looped here
-    base = "https://mangapill.com"
-    search_url = f"{base}/search?q={q.replace(' ', '+')}"
-    import httpx
-    from bs4 import BeautifulSoup
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(search_url)
-        soup = BeautifulSoup(resp.text, "html.parser")
+    async def fetch_mangapill(client):
+        url = f"https://mangapill.com/search?q={q_clean.replace(' ', '+')}"
+        r = await client.get(url)
+        soup = BeautifulSoup(r.text, "html.parser")
         for a in soup.select("a[href^='/manga/']"):
             title = a.text.strip()
             href = a.get("href")
             if href and title:
                 results.append({
                     "title": title,
-                    "url": base + href,
-                    "source": "mangapill"
+                    "url": f"https://mangapill.com{href}",
+                    "source": "Mangapill"
                 })
 
-    return results
+    async def fetch_mangasee(client):
+        url = f"https://mangasee123.com/search/?name={q_clean.replace(' ', '+')}"
+        r = await client.get(url)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for div in soup.select("a.SeriesName"):
+            title = div.text.strip()
+            href = div.get("href")
+            if href and title:
+                results.append({
+                    "title": title,
+                    "url": f"https://mangasee123.com{href}",
+                    "source": "MangaSee"
+                })
+
+    async def fetch_mangadex(client):
+        url = f"https://api.mangadex.org/manga?limit=10&title={q_clean}"
+        r = await client.get(url)
+        data = r.json()
+        for item in data.get("data", []):
+            title = item["attributes"]["title"].get("en") or list(item["attributes"]["title"].values())[0]
+            results.append({
+                "title": title,
+                "url": f"https://mangadex.org/title/{item['id']}",
+                "source": "MangaDex"
+            })
+
+    async def fetch_mangakakalot(client):
+        url = f"https://mangakakalot.com/search/story/{q_clean.replace(' ', '_')}"
+        r = await client.get(url)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for a in soup.select(".story_item a.item-img"):
+            href = a.get("href")
+            title_tag = a.find_next("h3")
+            title = title_tag.text.strip() if title_tag else "Unknown"
+            results.append({
+                "title": title,
+                "url": href,
+                "source": "Mangakakalot"
+            })
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        await asyncio.gather(
+            fetch_mangapill(client),
+            fetch_mangadex(client),
+            fetch_mangasee(client),
+            fetch_mangakakalot(client)
+        )
+
+    return sorted(results, key=lambda r: r["source"])
 
 
 # -------------------------------------------------------
