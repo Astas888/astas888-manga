@@ -1,8 +1,13 @@
 sudo tee frontend/index.html > /dev/null <<'EOF'
   <!-- Search Section -->
 <div class="mb-6">
-  <input v-model="searchQuery" @input="doSearch"
-         placeholder="Search manga..." class="px-4 py-2 rounded-l bg-gray-800 border border-gray-700 w-2/3" />
+  <input
+  v-model="searchQuery"
+  @input="doSearch"
+  placeholder="Search manga..."
+  class="px-4 py-2 rounded-l bg-gray-800 border border-gray-700 w-2/3"
+  autocomplete="off"
+/>
   <button @click="doSearch" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-r">Search</button>
 </div>
 
