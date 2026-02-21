@@ -1,56 +1,168 @@
-sudo tee frontend/index.html > /dev/null <<'EOF'
-  <!-- Search Section -->
-<div class="mb-6">
-  <input
-  v-model="searchQuery"
-  @input="doSearch"
-  placeholder="Search manga..."
-  class="px-4 py-2 rounded-l bg-gray-800 border border-gray-700 w-2/3"
-  autocomplete="off"
-/>
-  <button @click="doSearch" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-r">Search</button>
-</div>
-
-<!-- Autocomplete Results -->
-<ul v-if="searchResults.length > 0" class="bg-gray-800 rounded p-4 mb-6 max-h-80 overflow-y-auto">
-  <li v-for="r in searchResults" :key="r.url"
-    class="py-2 border-b border-gray-700 flex justify-between items-center">
-  <div>
-    <span class="font-semibold">{{ r.title }}</span>
-    <span class="ml-2 text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ r.source }}</span>
-  </div>
-  <button @click="startDownload(r.url)"
-          class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">
-    Download
-  </button>
-</li>
-</ul>
-
-<!-- Source Management -->
-<div class="mb-8">
-  <h2 class="text-lg font-semibold mb-2">Sources</h2>
-  <div class="flex flex-wrap gap-2">
-    <span v-for="s in sources" :key="s" class="bg-gray-700 px-3 py-1 rounded">
-      {{ s }}
-      <button @click="removeSource(s)" class="ml-2 text-red-400 hover:text-red-600">x</button>
-    </span>
-  </div>
-  <div class="mt-2 flex">
-    <input v-model="newSource" placeholder="Add new source..." class="px-2 py-1 rounded-l bg-gray-800 border border-gray-700" />
-    <button @click="addSource" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-r">Add</button>
-  </div>
-</div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Astas888 Manga Dashboard</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script type="module" src="/app.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css">
 </head>
-<body class="bg-gray-900 text-white">
-  <div id="app"></div>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-start p-6">
+  <div id="app" class="w-full max-w-5xl">
+    <h1 class="text-3xl font-bold mb-6 text-center">🌙 Astas888 Manga Dashboard</h1>
+
+    <!-- 🔍 Search Section -->
+    <div class="mb-6 flex justify-center">
+      <input v-model="searchQuery" @input="doSearch"
+             placeholder="Search manga..." autocomplete="off"
+             class="px-4 py-2 rounded-l bg-gray-800 border border-gray-700 w-2/3" />
+      <button @click="doSearch" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-r">Search</button>
+    </div>
+
+    <!-- 📚 Source Filters -->
+    <div class="mb-6 text-center">
+      <span v-for="src in sources" :key="src" class="mr-3">
+        <label class="inline-flex items-center space-x-1">
+          <input type="checkbox" v-model="activeSources" :value="src" class="form-checkbox text-blue-500">
+          <span>{{ src }}</span>
+        </label>
+      </span>
+    </div>
+
+    <!-- 🔄 Autocomplete Results -->
+    <ul v-if="searchResults.length > 0" class="bg-gray-800 rounded p-4 mb-6 max-h-80 overflow-y-auto">
+      <li v-for="r in searchResults" :key="r.url"
+          v-show="activeSources.includes(r.source)"
+          class="py-2 border-b border-gray-700 flex justify-between items-center">
+        <div>
+          <span class="font-semibold">{{ r.title }}</span>
+          <span class="ml-2 text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ r.source }}</span>
+        </div>
+        <button @click="startDownload(r.url)"
+                class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">
+          Download
+        </button>
+      </li>
+    </ul>
+
+    <!-- ⚙️ Source Management -->
+    <div class="mb-8">
+      <h2 class="text-lg font-semibold mb-2">Manage Sources</h2>
+      <div class="flex flex-wrap gap-2 mb-2">
+        <span v-for="s in sources" :key="s" class="bg-gray-700 px-3 py-1 rounded">
+          {{ s }}
+          <button @click="removeSource(s)" class="ml-2 text-red-400 hover:text-red-600">x</button>
+        </span>
+      </div>
+      <div class="mt-2 flex">
+        <input v-model="newSource" placeholder="Add new source..." class="px-2 py-1 rounded-l bg-gray-800 border border-gray-700" />
+        <button @click="addSource" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded-r">Add</button>
+      </div>
+    </div>
+
+    <!-- 📦 Active Jobs -->
+    <h2 class="text-xl mb-2">Active Jobs</h2>
+    <div v-if="jobs.length === 0" class="text-gray-400 mb-4">No active downloads</div>
+    <div v-for="job in jobs" :key="job.id" class="bg-gray-800 p-4 rounded mb-3">
+      <div class="flex justify-between items-center mb-2">
+        <span class="font-semibold">{{ job.title }}</span>
+        <button @click="cancelJob(job.id)" class="text-red-400 hover:text-red-600">Cancel</button>
+      </div>
+      <div class="w-full bg-gray-700 rounded h-4 mb-1">
+        <div class="bg-blue-500 h-4 rounded" :style="{ width: job.progress + '%' }"></div>
+      </div>
+      <div class="text-sm text-gray-400">{{ job.progress }}%</div>
+    </div>
+
+    <!-- 🕓 History -->
+    <h2 class="text-xl mt-6 mb-2">History</h2>
+    <div v-if="history.length === 0" class="text-gray-400">No completed downloads</div>
+    <ul>
+      <li v-for="h in history" :key="h.id" class="border-b border-gray-700 py-2">
+        ✅ {{ h.title }} — {{ h.status }}
+      </li>
+    </ul>
+  </div>
+
+  <!-- 🧠 Vue App Logic -->
+  <script type="module">
+    const app = Vue.createApp({
+      data() {
+        return {
+          apiBase: '',
+          searchQuery: '',
+          searchResults: [],
+          sources: [],
+          activeSources: [],
+          newSource: '',
+          jobs: [],
+          history: []
+        };
+      },
+      methods: {
+        async fetchSources() {
+          const res = await fetch(`${this.apiBase}/api/v1/sources`);
+          this.sources = await res.json();
+          this.activeSources = [...this.sources]; // default: all active
+        },
+        async addSource() {
+          if (!this.newSource) return;
+          await fetch(`${this.apiBase}/api/v1/sources`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: this.newSource })
+          });
+          this.newSource = '';
+          this.fetchSources();
+        },
+        async removeSource(name) {
+          await fetch(`${this.apiBase}/api/v1/sources/${name}`, { method: 'DELETE' });
+          this.fetchSources();
+        },
+        async doSearch() {
+          if (this.searchQuery.length < 2) {
+            this.searchResults = [];
+            return;
+          }
+          const res = await fetch(`${this.apiBase}/api/v1/search?q=${encodeURIComponent(this.searchQuery)}`);
+          const data = await res.json();
+          // Deduplicate by title + source
+          const seen = new Set();
+          this.searchResults = data.filter(r => {
+            const key = `${r.title}-${r.source}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        },
+        async startDownload(url) {
+          const res = await fetch(`${this.apiBase}/api/v1/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+          });
+          const data = await res.json();
+          alert(data.message);
+          this.fetchStatus();
+        },
+        async cancelJob(id) {
+          await fetch(`${this.apiBase}/api/v1/cancel/${id}`, { method: 'POST' });
+          this.fetchStatus();
+        },
+        async fetchStatus() {
+          const res = await fetch(`${this.apiBase}/api/v1/history`);
+          this.history = await res.json();
+        },
+        updateJobs() {
+          this.fetchStatus();
+        }
+      },
+      mounted() {
+        this.fetchSources();
+        this.fetchStatus();
+        setInterval(this.updateJobs, 5000);
+      }
+    });
+    app.mount('#app');
+  </script>
 </body>
 </html>
-EOF
