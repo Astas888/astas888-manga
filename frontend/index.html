@@ -9,10 +9,16 @@ sudo tee frontend/index.html > /dev/null <<'EOF'
 <!-- Autocomplete Results -->
 <ul v-if="searchResults.length > 0" class="bg-gray-800 rounded p-4 mb-6 max-h-80 overflow-y-auto">
   <li v-for="r in searchResults" :key="r.url"
-      class="py-2 border-b border-gray-700 flex justify-between items-center">
-    <span>{{ r.title }} <span class="text-sm text-gray-500">({{ r.source }})</span></span>
-    <button @click="startDownload(r.url)" class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">Download</button>
-  </li>
+    class="py-2 border-b border-gray-700 flex justify-between items-center">
+  <div>
+    <span class="font-semibold">{{ r.title }}</span>
+    <span class="ml-2 text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300">{{ r.source }}</span>
+  </div>
+  <button @click="startDownload(r.url)"
+          class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm">
+    Download
+  </button>
+</li>
 </ul>
 
 <!-- Source Management -->
